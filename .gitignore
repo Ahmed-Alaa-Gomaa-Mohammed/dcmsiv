@@ -1,0 +1,68 @@
+# ==============================================================================
+# dcmsiv - Git Ignore Configuration
+# ==============================================================================
+
+# Core Principle I: Zero Sensitive Data & PHI Leakage (NON-NEGOTIABLE)
+# Real DICOM files, medical images, patient metadata, and clinical datasets
+testset/
+testsets/
+data/
+*.dcm
+*.DCM
+*.dicom
+*.DICOM
+*.ima
+*.IMA
+
+# Databases and Data Caches
+*.db
+*.sqlite
+*.sqlite3
+*.duckdb
+*.parquet
+*.arrow
+
+# Processing Outputs & Logs
+output/
+sorted/
+quarantine/
+logs/
+*.log
+
+# Environment, Temp & OS Artifacts
+tmp/
+temp/
+.env
+.env.*
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# IDE & Editor Settings
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Common Build & Environment Artifacts
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+env/
+dist/
+build/
+*.egg-info/
+
+# Rust
+target/
+
+# Go / Binary
+bin/
+*.exe
+*.dll
+*.so
+*.dylib
