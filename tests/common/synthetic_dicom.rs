@@ -361,13 +361,28 @@ pub fn generate_synthetic_rgb_dicom(
         None
     };
 
-    // Calculate BGR-swapped reference hash
-    let mut swapped_pixels = raw_pixels.clone();
-    for i in (0..raw_pixel_len).step_by(3) {
-        swapped_pixels.swap(i, i + 2); // Swap R and B
+    // Calculate Windows DIB reference hash:
+    // BGR byte order + row padded to 4-byte DWORD boundary
+    let rows = options.rows as usize;
+    let cols = options.columns as usize;
+    let pad_per_row = (4 - ((cols * 3) % 4)) % 4;
+    let dib_row_len = cols * 3 + pad_per_row;
+    let mut dib_pixels = vec![0u8; rows * dib_row_len];
+
+    for r in 0..rows {
+        let src_row = r * cols * 3;
+        let dst_row = r * dib_row_len;
+        for c in 0..cols {
+            let src_idx = src_row + c * 3;
+            let dst_idx = dst_row + c * 3;
+            dib_pixels[dst_idx] = raw_pixels[src_idx + 2];     // B
+            dib_pixels[dst_idx + 1] = raw_pixels[src_idx + 1]; // G
+            dib_pixels[dst_idx + 2] = raw_pixels[src_idx];     // R
+        }
     }
+
     let mut hasher = Sha1::new();
-    hasher.update(&swapped_pixels);
+    hasher.update(&dib_pixels);
     let bgr_swapped_hash = format!("{:040x}", hasher.finalize());
 
     // Write (7FE0, 0010) OB element

@@ -82,7 +82,7 @@ fn test_hasher_real_testset_file_31() {
 }
 
 #[test]
-fn test_hasher_8bit_rgb_bgr_swap_and_pad_byte() {
+fn test_hasher_8bit_rgb_bgr_swap_and_dib_layout() {
     let dir = tempdir().unwrap();
     let file_path = dir.path().join("rgb_test.dcm");
 
@@ -104,25 +104,29 @@ fn test_hasher_8bit_rgb_bgr_swap_and_pad_byte() {
 }
 
 #[test]
-fn test_hasher_8bit_rgb_pad_sweep() {
+fn test_hasher_8bit_rgb_various_row_strides() {
     let dir = tempdir().unwrap();
-    let file_path = dir.path().join("rgb_sweep_test.dcm");
 
-    let expected_pad = 0xA5u8;
-    let opts = crate::common::synthetic_dicom::SyntheticRgbOptions {
-        rows: 65,
-        columns: 65,
-        custom_pad_byte: Some(expected_pad),
-        ..Default::default()
-    };
+    // Test with columns % 4 padding variations:
+    // col * 3 % 4:
+    // col = 64 -> 192 % 4 = 0 (pad = 0)
+    // col = 65 -> 195 % 4 = 3 (pad = 1)
+    // col = 66 -> 198 % 4 = 2 (pad = 2)
+    // col = 67 -> 201 % 4 = 1 (pad = 3)
+    for cols in [64u16, 65, 66, 67] {
+        let file_path = dir.path().join(format!("rgb_stride_{cols}.dcm"));
+        let opts = crate::common::synthetic_dicom::SyntheticRgbOptions {
+            rows: 32,
+            columns: cols,
+            custom_pad_byte: Some(0x00),
+            ..Default::default()
+        };
 
-    let info = crate::common::synthetic_dicom::generate_synthetic_rgb_dicom(&file_path, &opts).unwrap();
-    let meta = read_dicom_header(&file_path).unwrap();
+        let info = crate::common::synthetic_dicom::generate_synthetic_rgb_dicom(&file_path, &opts).unwrap();
+        let meta = read_dicom_header(&file_path).unwrap();
+        let (computed_hash, layer_count) = compute_pixel_layer_hash(&file_path, &meta).unwrap();
 
-    let sweep = dcmsiv::dicom::hasher::compute_pad_sweep_hashes(&file_path, &meta).unwrap();
-    assert_eq!(sweep.len(), 256);
-
-    // Find the candidate matching expected_pad
-    let matched = sweep.iter().find(|(_, pad)| *pad == expected_pad).unwrap();
-    assert_eq!(matched.0, info.bgr_swapped_hash);
+        assert_eq!(layer_count, LayerCount::Single);
+        assert_eq!(computed_hash, info.bgr_swapped_hash, "Hash mismatch for cols={cols}");
+    }
 }

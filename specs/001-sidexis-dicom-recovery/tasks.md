@@ -42,13 +42,13 @@
 ### Tests for User Story 1
 
 - [X] T010 [P] [US1] Create unit tests for DICOM Part 10 preamble and tag extraction (`PatientID`, `RETIRED_OtherPatientIDs`, `AcquisitionDateTime`, dimensions) in `tests/unit/header_tests.rs`
-- [X] T011 [P] [US1] Create unit tests for positional seek, middle-layer SHA-1 hashing formula ($\lfloor N/2 \rfloor \times \text{frame\_size}$), and 8-bit RGB BGR channel swapping with pad byte retention in `tests/unit/hasher_tests.rs`
+- [X] T011 [P] [US1] Create unit tests for positional seek, middle-layer SHA-1 hashing formula ($\lfloor N/2 \rfloor \times \text{frame\_size}$), and 8-bit RGB BGR channel swapping *(superseded for RGB by T048)* in `tests/unit/hasher_tests.rs`
 - [X] T012 [P] [US1] Create integration test for end-to-end recovery and non-destructive move sorting in `tests/integration/recovery_tests.rs`
 
 ### Implementation for User Story 1
 
 - [X] T013 [US1] Implement streaming DICOM Part 10 header reader extracting `PatientID` (0010,0020), `RETIRED_OtherPatientIDs` (0010,1000), `AcquisitionDateTime` (0008,002A), frame dimensions, and layer layout tags (`SamplesPerPixel`, `PhotometricInterpretation`, `PlanarConfiguration`) in `src/dicom/header.rs`
-- [X] T014 [US1] Implement positional seek, middle-layer SHA-1 stream calculator, and 8-bit RGB BGR channel swapper with pad byte retention/sweep in `src/dicom/hasher.rs`
+- [X] T014 [US1] Implement positional seek, middle-layer SHA-1 stream calculator, and 8-bit RGB BGR channel swapper *(superseded for RGB by T050)* in `src/dicom/hasher.rs`
 - [X] T015 [US1] Implement database matching logic cross-referencing candidate scans against in-memory indexed `Patient` and `MediaBase` records in `src/engine/processor.rs`
 - [X] T016 [US1] Implement collision-safe file mover (`std::fs::rename` with stream copy fallback) with naming `Volume_<FormattedDateTime>.dcm` or `RasterImage_<FormattedDateTime>.dcm` in `src/engine/sorter.rs`
 - [X] T017 [US1] Wire core MVP discovery and parallel sorting pipeline with `rayon` in `src/main.rs`
@@ -198,13 +198,14 @@
 
 ### Tests for Phase 11
 
-- [ ] T048 [P] [US1] Update unit tests in `tests/unit/hasher_tests.rs` to verify Windows DIB row-stride aligned BGR hashing (replacing pad byte retention tests)
-- [ ] T049 [P] [US1] Update synthetic 8-bit RGB DICOM generator in `tests/common/synthetic_dicom.rs` to support DIB row-stride hash validation
+- [X] T048 [P] [US1] Update unit tests in `tests/unit/hasher_tests.rs` to verify Windows DIB row-stride aligned BGR hashing (replacing pad byte retention tests)
+- [X] T049 [P] [US1] Update synthetic 8-bit RGB DICOM generator in `tests/common/synthetic_dicom.rs` to support DIB row-stride hash validation
 
 ### Implementation for Phase 11
 
-- [ ] T050 [US1] Rewrite `compute_pixel_layer_hash` 8-bit RGB branch in `src/dicom/hasher.rs` to reconstruct decoded pixels into Windows DIB layout (BGR + 4-byte row padding) before SHA-1 hashing
-- [ ] T051 [US1] Remove `compute_pad_sweep_hashes` function and pad-sweep fallback matching from `src/engine/processor.rs`
+- [X] T050 [US1] Rewrite `compute_pixel_layer_hash` 8-bit RGB branch in `src/dicom/hasher.rs` to reconstruct decoded pixels into Windows DIB layout (BGR + 4-byte row padding) before SHA-1 hashing
+- [X] T051 [US1] Remove `compute_pad_sweep_hashes` function and pad-sweep fallback matching from `src/engine/processor.rs`
+- [X] T052 [P] Create GitHub Actions CI workflow (`.github/workflows/ci.yml`) testing cargo build and test matrix on Ubuntu and Windows
 
 ---
 

@@ -47,31 +47,44 @@ pub fn compute_pixel_layer_hash(
         && metadata.planar_configuration == 0;
 
     if is_rgb_single_layer {
-        let pixel_len = (metadata.rows as usize) * (metadata.columns as usize) * 3;
+        let rows = metadata.rows as usize;
+        let cols = metadata.columns as usize;
+        let pixel_len = rows * cols * 3;
         if pixel_len == 0 {
             return Err(HasherError::InvalidDimensions);
         }
 
-        let is_odd = !pixel_len.is_multiple_of(2);
-        let expected_total_len = if is_odd { pixel_len + 1 } else { pixel_len };
-        let total_read_len = if metadata.pixel_data_length > 0 {
-            (metadata.pixel_data_length as usize).max(pixel_len)
-        } else {
-            expected_total_len
-        };
-
+        // Seek to PixelData value start and read the raw pixel data
         file.seek(SeekFrom::Start(metadata.pixel_data_offset))?;
-        let mut pixel_buf = vec![0u8; total_read_len];
-        file.read_exact(&mut pixel_buf)?;
+        let mut raw_pixels = vec![0u8; pixel_len];
+        file.read_exact(&mut raw_pixels)?;
 
-        // Swap R and B channels (bytes 1 and 3 of every 3-byte pixel) in-place
-        for i in (0..pixel_len).step_by(3) {
-            pixel_buf.swap(i, i + 2);
+        // Reconstruct into Windows DIB memory layout:
+        // 1. Swap R and B channels (BGR byte order)
+        // 2. Pad each row to a 4-byte (DWORD) boundary with 0x00 bytes
+        // 3. Stored top-to-bottom
+        let pad_per_row = (4 - ((cols * 3) % 4)) % 4;
+        let dib_row_len = cols * 3 + pad_per_row;
+        let mut dib_buffer = vec![0u8; rows * dib_row_len];
+
+        for r in 0..rows {
+            let src_row_start = r * cols * 3;
+            let dst_row_start = r * dib_row_len;
+
+            for c in 0..cols {
+                let src_idx = src_row_start + c * 3;
+                let dst_idx = dst_row_start + c * 3;
+                let r_val = raw_pixels[src_idx];
+                let g_val = raw_pixels[src_idx + 1];
+                let b_val = raw_pixels[src_idx + 2];
+                dib_buffer[dst_idx] = b_val;
+                dib_buffer[dst_idx + 1] = g_val;
+                dib_buffer[dst_idx + 2] = r_val;
+            }
         }
 
-        // Trailing pad byte (if present) is kept unswapped and intact
         let mut hasher = Sha1::new();
-        hasher.update(&pixel_buf);
+        hasher.update(&dib_buffer);
         let hash_str = format!("{:040x}", hasher.finalize());
         return Ok((hash_str, LayerCount::Single));
     }
@@ -131,46 +144,3 @@ pub fn compute_pixel_layer_hash(
     Ok((hash_str, layer_count))
 }
 
-/// Evaluates all 256 possible pad byte values for 8-bit RGB rasters with odd pixel length
-/// Returns a vector of (SHA-1 hash, pad_byte)
-pub fn compute_pad_sweep_hashes(
-    path: &Path,
-    metadata: &DicomMetadata,
-) -> Result<Vec<(String, u8)>, HasherError> {
-    let frames = metadata.number_of_frames;
-    let is_rgb_single_layer = frames <= 1
-        && metadata.samples_per_pixel == 3
-        && metadata.bits_allocated == 8
-        && metadata.planar_configuration == 0;
-
-    if !is_rgb_single_layer {
-        return Ok(Vec::new());
-    }
-
-    let pixel_len = (metadata.rows as usize) * (metadata.columns as usize) * 3;
-    if pixel_len.is_multiple_of(2) {
-        return Ok(Vec::new());
-    }
-
-    let mut file = File::open(path)?;
-    file.seek(SeekFrom::Start(metadata.pixel_data_offset))?;
-
-    let mut pixel_buf = vec![0u8; pixel_len + 1];
-    file.read_exact(&mut pixel_buf[..pixel_len])?;
-
-    // Swap R and B
-    for i in (0..pixel_len).step_by(3) {
-        pixel_buf.swap(i, i + 2);
-    }
-
-    let mut results = Vec::with_capacity(256);
-    for pad in 0u8..=255u8 {
-        pixel_buf[pixel_len] = pad;
-        let mut hasher = Sha1::new();
-        hasher.update(&pixel_buf);
-        let h = format!("{:040x}", hasher.finalize());
-        results.push((h, pad));
-    }
-
-    Ok(results)
-}

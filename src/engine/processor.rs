@@ -135,21 +135,12 @@ pub fn evaluate_candidate(
     };
 
     // Match in MediaBase
-    let mut final_matched_hash = computed_hash.clone();
+    let final_matched_hash = computed_hash.clone();
     let mb_match = if let Some(ref pat) = resolved_patient {
         mediabase_index
             .get_by_patient_and_hash(pat.patient_id, &computed_hash)
             .cloned()
             .or_else(|| {
-                // If direct match failed, and file is 8-bit RGB single layer with odd length, check pad-sweep candidates
-                if let Ok(candidates) = crate::dicom::hasher::compute_pad_sweep_hashes(path, &header) {
-                    for (cand_hash, _pad) in candidates {
-                        if let Some(mb) = mediabase_index.get_by_patient_and_hash(pat.patient_id, &cand_hash) {
-                            final_matched_hash = cand_hash;
-                            return Some(mb.clone());
-                        }
-                    }
-                }
                 // If patient record didn't match directly, check if hash matches any entry
                 mediabase_index
                     .get_by_hash(&computed_hash)
@@ -159,20 +150,6 @@ pub fn evaluate_candidate(
         mediabase_index
             .get_by_hash(&computed_hash)
             .and_then(|list| list.first().cloned())
-            .or_else(|| {
-                // If no resolved patient, check if any pad-sweep candidate matches any MediaBase entry
-                if let Ok(candidates) = crate::dicom::hasher::compute_pad_sweep_hashes(path, &header) {
-                    for (cand_hash, _pad) in candidates {
-                        if let Some(list) = mediabase_index.get_by_hash(&cand_hash) {
-                            if let Some(first) = list.first() {
-                                final_matched_hash = cand_hash;
-                                return Some(first.clone());
-                            }
-                        }
-                    }
-                }
-                None
-            })
     };
 
     if let Some(mb_rec) = mb_match {
