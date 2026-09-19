@@ -21,6 +21,7 @@ data/
 *.duckdb
 *.parquet
 *.arrow
+*.csv
 
 # Processing Outputs & Logs
 output/

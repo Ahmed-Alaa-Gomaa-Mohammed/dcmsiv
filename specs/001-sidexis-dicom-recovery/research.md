@@ -31,6 +31,10 @@
     $$\text{FrameOffset} = \text{PixelDataStartOffset} + (\text{MiddleIndex} \times \text{FrameSize})$$
   - The reader then issues a positional seek directly to `FrameOffset` and streams exactly `FrameSize` bytes (typically 1–2 MB) through the SHA-1 hasher.
   - This turns a 250 MB disk read into a ~64 KB header read + ~1 MB frame read, achieving a >95% reduction in disk I/O per volumetric scan.
+  - **Single-Layer Layout-Specific Hashing**:
+    - **16-bit MONOCHROME2**: The Pixel Data element value is hashed directly as stored with no channel or byte modifications.
+    - **8-bit RGB Interleaved (`PlanarConfiguration = 0`)**: SIDEXIS performs a red-and-blue channel swap (`R, G, B` $\rightarrow$ `B, G, R`, swapping bytes 1 and 3 of every 3-byte pixel) across the first `Rows × Columns × 3` bytes. Any trailing pad byte (present when `Rows × Columns × 3` is odd) is appended unswapped.
+    - **Pad Byte Sweep Recovery**: In carved files or stored copies where the original pad byte was rewritten to `0x00`, the hasher supports sweeping the 256 possible pad byte values (`0x00`–`0xFF`) to recover the exact incoming hash reported by SIDEXIS.
 - **Alternatives Considered**:
   - *Full DICOM parsing libraries (e.g. loading complete pixel dataset)*: Rejected because loading full 250 MB volumes exhausts RAM and throttles throughput below the required 15 volumes/sec threshold.
   - *Memory-mapped files (`mmap`)*: Viable on 64-bit OS, but susceptible to SIGBUS on truncated files and problematic on network-mounted Windows SMB shares. Explicit buffered seeking provides safer, verifiable error handling.

@@ -10,10 +10,10 @@
 
 **Purpose**: Project initialization and basic structure
 
-- [ ] T001 Initialize Rust package `dcmsiv` with 2021 edition and binary target in `Cargo.toml`
-- [ ] T002 Add dependencies (`clap`, `rayon`, `rusqlite`, `csv`, `sha1`, `indicatif`, `serde`, `serde_json`, `chrono`, `crossbeam-channel`) to `Cargo.toml`
-- [ ] T003 [P] Create core module directory layout (`src/dicom`, `src/db`, `src/engine`, `src/report`) and entry point stubs in `src/main.rs`
-- [ ] T004 [P] Create synthetic DICOM generator utility (zero PHI) for automated testing in `tests/common/synthetic_dicom.rs`
+- [X] T001 Initialize Rust package `dcmsiv` with 2021 edition and binary target in `Cargo.toml`
+- [X] T002 Add dependencies (`clap`, `rayon`, `rusqlite`, `csv`, `sha1`, `indicatif`, `serde`, `serde_json`, `chrono`, `crossbeam-channel`) to `Cargo.toml`
+- [X] T003 [P] Create core module directory layout (`src/dicom`, `src/db`, `src/engine`, `src/report`) and entry point stubs in `src/main.rs`
+- [X] T004 [P] Create synthetic DICOM generator utility (zero PHI) for automated testing in `tests/common/synthetic_dicom.rs`
 
 ---
 
@@ -23,11 +23,11 @@
 
 **⚠️ CRITICAL**: No user story work can begin until this phase is complete
 
-- [ ] T005 [P] Define core domain types (`PatientRecord`, `MediaBaseRecord`, `DicomScan`, `FileDisposition`) in `src/dicom/types.rs`
-- [ ] T006 [P] Implement streaming CSV parser and indexer validating `PatientId`, `InternalCardId`, `CreationDate`, `MediaHash`, and `RootNode` in `src/db/csv_reader.rs`
-- [ ] T007 [P] Create embedded SQLite state database initialization with WAL mode (`PRAGMA journal_mode=WAL; PRAGMA synchronous=NORMAL;`) in `src/db/state_store.rs`
-- [ ] T008 Implement CLI argument parser with `clap` derive for `--input`, `--output`, `--patient-csv`, `--mediabase-csv`, `--copy`, `--dry-run`, `--undo`, and `--reset-state` in `src/cli.rs`
-- [ ] T009 Implement runtime configuration resolver mapping CLI flags and standard exit codes (0, 1, 2, 3, 4) in `src/config.rs`
+- [X] T005 [P] Define core domain types (`PatientRecord`, `MediaBaseRecord`, `DicomScan`, `FileDisposition`) in `src/dicom/types.rs`
+- [X] T006 [P] Implement streaming CSV parser and indexer validating `PatientId`, `InternalCardId`, `CreationDate`, `MediaHash`, and `RootNode` in `src/db/csv_reader.rs`
+- [X] T007 [P] Create embedded SQLite state database initialization with WAL mode (`PRAGMA journal_mode=WAL; PRAGMA synchronous=NORMAL;`) in `src/db/state_store.rs`
+- [X] T008 Implement CLI argument parser with `clap` derive for `--input`, `--output`, `--patient-csv`, `--mediabase-csv`, `--copy`, `--dry-run`, `--undo`, and `--reset-state` in `src/cli.rs`
+- [X] T009 Implement runtime configuration resolver mapping CLI flags and standard exit codes (0, 1, 2, 3, 4) in `src/config.rs`
 
 **Checkpoint**: Foundation ready - user story implementation can now begin in parallel
 
@@ -41,17 +41,17 @@
 
 ### Tests for User Story 1
 
-- [ ] T010 [P] [US1] Create unit tests for DICOM Part 10 preamble and tag extraction (`PatientID`, `RETIRED_OtherPatientIDs`, `AcquisitionDateTime`, dimensions) in `tests/unit/header_tests.rs`
-- [ ] T011 [P] [US1] Create unit tests for positional seek and middle-layer SHA-1 hashing formula ($\lfloor N/2 \rfloor \times \text{frame\_size}$) in `tests/unit/hasher_tests.rs`
-- [ ] T012 [P] [US1] Create integration test for end-to-end recovery and non-destructive move sorting in `tests/integration/recovery_tests.rs`
+- [X] T010 [P] [US1] Create unit tests for DICOM Part 10 preamble and tag extraction (`PatientID`, `RETIRED_OtherPatientIDs`, `AcquisitionDateTime`, dimensions) in `tests/unit/header_tests.rs`
+- [X] T011 [P] [US1] Create unit tests for positional seek, middle-layer SHA-1 hashing formula ($\lfloor N/2 \rfloor \times \text{frame\_size}$), and 8-bit RGB BGR channel swapping with pad byte retention in `tests/unit/hasher_tests.rs`
+- [X] T012 [P] [US1] Create integration test for end-to-end recovery and non-destructive move sorting in `tests/integration/recovery_tests.rs`
 
 ### Implementation for User Story 1
 
-- [ ] T013 [US1] Implement streaming DICOM Part 10 header reader extracting `PatientID` (0010,0020), `RETIRED_OtherPatientIDs` (0010,1000), `AcquisitionDateTime` (0008,002A), and frame dimensions in `src/dicom/header.rs`
-- [ ] T014 [US1] Implement positional seek and middle-layer SHA-1 stream calculator reading only $\lfloor N/2 \rfloor$ frame bytes in `src/dicom/hasher.rs`
-- [ ] T015 [US1] Implement database matching logic cross-referencing candidate scans against in-memory indexed `Patient` and `MediaBase` records in `src/engine/processor.rs`
-- [ ] T016 [US1] Implement collision-safe file mover (`std::fs::rename` with stream copy fallback) with naming `Volume_<FormattedDateTime>.dcm` or `RasterImage_<FormattedDateTime>.dcm` in `src/engine/sorter.rs`
-- [ ] T017 [US1] Wire core MVP discovery and parallel sorting pipeline with `rayon` in `src/main.rs`
+- [X] T013 [US1] Implement streaming DICOM Part 10 header reader extracting `PatientID` (0010,0020), `RETIRED_OtherPatientIDs` (0010,1000), `AcquisitionDateTime` (0008,002A), and frame dimensions in `src/dicom/header.rs`
+- [X] T014 [US1] Implement positional seek, middle-layer SHA-1 stream calculator, and 8-bit RGB BGR channel swapper with pad byte retention/sweep in `src/dicom/hasher.rs`
+- [X] T015 [US1] Implement database matching logic cross-referencing candidate scans against in-memory indexed `Patient` and `MediaBase` records in `src/engine/processor.rs`
+- [X] T016 [US1] Implement collision-safe file mover (`std::fs::rename` with stream copy fallback) with naming `Volume_<FormattedDateTime>.dcm` or `RasterImage_<FormattedDateTime>.dcm` in `src/engine/sorter.rs`
+- [X] T017 [US1] Wire core MVP discovery and parallel sorting pipeline with `rayon` in `src/main.rs`
 
 **Checkpoint**: User Story 1 is fully functional and testable as an MVP
 
@@ -65,14 +65,14 @@
 
 ### Tests for User Story 6
 
-- [ ] T018 [P] [US6] Create integration test for process interruption and state resumption from `.dcmsiv_state.db` in `tests/integration/resume_tests.rs`
+- [X] T018 [P] [US6] Create integration test for process interruption and state resumption from `.dcmsiv_state.db` in `tests/integration/resume_tests.rs`
 
 ### Implementation for User Story 6
 
-- [ ] T019 [US6] Implement lock-free MPSC channel and background SQLite writer thread batching state inserts in `src/db/state_store.rs`
-- [ ] T020 [US6] Implement resume detection querying `scanned_files` to skip already completed files on startup in `src/engine/processor.rs`
-- [ ] T021 [US6] Implement signal handling for SIGINT and SIGTERM to trigger graceful flush and database closure in `src/main.rs`
-- [ ] T022 [US6] Implement `--reset-state` flag to wipe existing `.dcmsiv_state.db` and re-evaluate all files from scratch in `src/engine/processor.rs`
+- [X] T019 [US6] Implement lock-free MPSC channel and background SQLite writer thread batching state inserts in `src/db/state_store.rs`
+- [X] T020 [US6] Implement resume detection querying `scanned_files` to skip already completed files on startup in `src/engine/processor.rs`
+- [X] T021 [US6] Implement signal handling for SIGINT and SIGTERM to trigger graceful flush and database closure in `src/main.rs`
+- [X] T022 [US6] Implement `--reset-state` flag to wipe existing `.dcmsiv_state.db` and re-evaluate all files from scratch in `src/engine/processor.rs`
 
 **Checkpoint**: Recovery is resilient to crashes and can be paused/resumed indefinitely
 
@@ -86,13 +86,13 @@
 
 ### Tests for User Story 2
 
-- [ ] T023 [P] [US2] Create integration tests for corrupt, duplicate, and unmatched quarantine routing in `tests/integration/quarantine_tests.rs`
+- [X] T023 [P] [US2] Create integration tests for corrupt, duplicate, and unmatched quarantine routing in `tests/integration/quarantine_tests.rs`
 
 ### Implementation for User Story 2
 
-- [ ] T024 [US2] Implement corrupt file classification and isolation into `<output>/corrupt/` with failure reason logging in `src/engine/sorter.rs`
-- [ ] T025 [US2] Implement duplicate file segregation into `<output>/duplicates/` with unique collision-free suffixes in `src/engine/sorter.rs`
-- [ ] T026 [US2] Implement unmatched valid DICOM scan routing into `<output>/unmatched/` in `src/engine/sorter.rs`
+- [X] T024 [US2] Implement corrupt file classification and isolation into `<output>/corrupt/` with failure reason logging in `src/engine/sorter.rs`
+- [X] T025 [US2] Implement duplicate file segregation into `<output>/duplicates/` with unique collision-free suffixes in `src/engine/sorter.rs`
+- [X] T026 [US2] Implement unmatched valid DICOM scan routing into `<output>/unmatched/` in `src/engine/sorter.rs`
 
 **Checkpoint**: Corrupted and duplicate data are completely isolated from clinical patient directories
 
@@ -106,13 +106,13 @@
 
 ### Tests for User Story 5
 
-- [ ] T027 [P] [US5] Create integration test for `--undo` rollback fidelity in `tests/integration/undo_tests.rs`
+- [X] T027 [P] [US5] Create integration test for `--undo` rollback fidelity in `tests/integration/undo_tests.rs`
 
 ### Implementation for User Story 5
 
-- [ ] T028 [US5] Implement transaction logging in `transactions` table during move operations in `src/db/state_store.rs`
-- [ ] T029 [US5] Implement undo rollback engine restoring files from destination to source in reverse order in `src/engine/undo.rs`
-- [ ] T030 [US5] Wire CLI `--undo <OUTPUT_DIR>` invocation and error reporting in `src/main.rs`
+- [X] T028 [US5] Implement transaction logging in `transactions` table during move operations in `src/db/state_store.rs`
+- [X] T029 [US5] Implement undo rollback engine restoring files from destination to source in reverse order in `src/engine/undo.rs`
+- [X] T030 [US5] Wire CLI `--undo <OUTPUT_DIR>` invocation and error reporting in `src/main.rs`
 
 **Checkpoint**: All move operations are 100% reversible via `--undo`
 
@@ -126,14 +126,14 @@
 
 ### Tests for User Story 3
 
-- [ ] T031 [P] [US3] Create unit tests for distinct `RootNode` deduplication and recovery percentage calculations in `tests/unit/summary_tests.rs`
+- [X] T031 [P] [US3] Create unit tests for distinct `RootNode` deduplication and recovery percentage calculations in `tests/unit/summary_tests.rs`
 
 ### Implementation for User Story 3
 
-- [ ] T032 [US3] Implement thread-safe `indicatif` progress bar tracking processed count, rate (files/sec), and ETA in `src/report/progress.rs`
-- [ ] T033 [US3] Implement distinct `RootNode` recovery rate calculation: `Recovered unique RootNodes / Total distinct RootNodes in MediaBase * 100%` in `src/report/summary.rs`
-- [ ] T034 [US3] Implement formatted stdout summary table and raw `--json` stdout output mode in `src/report/summary.rs`
-- [ ] T035 [US3] Implement persistent report writers generating `recovery_report.json` and `recovery_report.txt` in `<output_dir>` in `src/report/summary.rs`
+- [X] T032 [US3] Implement thread-safe `indicatif` progress bar tracking processed count, rate (files/sec), and ETA in `src/report/progress.rs`
+- [X] T033 [US3] Implement distinct `RootNode` recovery rate calculation: `Recovered unique RootNodes / Total distinct RootNodes in MediaBase * 100%` in `src/report/summary.rs`
+- [X] T034 [US3] Implement formatted stdout summary table and raw `--json` stdout output mode in `src/report/summary.rs`
+- [X] T035 [US3] Implement persistent report writers generating `recovery_report.json` and `recovery_report.txt` in `<output_dir>` in `src/report/summary.rs`
 
 **Checkpoint**: Observability is complete with live progress and audit reporting
 
@@ -147,11 +147,11 @@
 
 ### Tests for User Story 4
 
-- [ ] T036 [P] [US4] Create integration test for `--dry-run` mode verifying zero filesystem mutations in `tests/integration/dry_run_tests.rs`
+- [X] T036 [P] [US4] Create integration test for `--dry-run` mode verifying zero filesystem mutations in `tests/integration/dry_run_tests.rs`
 
 ### Implementation for User Story 4
 
-- [ ] T037 [US4] Implement dry-run bypass across `src/engine/sorter.rs` and `src/db/state_store.rs` preventing disk writes when `--dry-run` is active
+- [X] T037 [US4] Implement dry-run bypass across `src/engine/sorter.rs` and `src/db/state_store.rs` preventing disk writes when `--dry-run` is active
 
 **Checkpoint**: Operators can safely preview recovery plans prior to committing disk writes
 
@@ -161,9 +161,9 @@
 
 **Purpose**: Cross-platform verification, performance validation, and final sanity checks
 
-- [ ] T038 [P] Verify cross-platform path handling and illegal Windows character sanitization in `src/engine/sorter.rs`
-- [ ] T039 [P] Verify memory consumption remains strictly $<500\text{ MB}$ under batch load in `tests/integration/memory_bound_tests.rs`
-- [ ] T040 Execute end-to-end scenarios from `quickstart.md` and verify zero PHI in test fixtures
+- [X] T038 [P] Verify cross-platform path handling and illegal Windows character sanitization in `src/engine/sorter.rs`
+- [X] T039 [P] Verify memory consumption remains strictly $<500\text{ MB}$ under batch load in `tests/integration/memory_bound_tests.rs`
+- [X] T040 Execute end-to-end scenarios from `quickstart.md` and verify zero PHI in test fixtures
 
 ---
 

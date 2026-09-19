@@ -50,10 +50,20 @@ Represents an individual physical file discovered in the input recovery director
 | `acquisition_datetime`| `Option<NaiveDateTime>`| Extracted from Tag `(0008, 002A)` or fallback date/time tags |
 | `layer_count` | `usize` | Total number of frames (`(0028, 0008)`), defaults to 1 if absent |
 | `middle_layer_index` | `usize` | $\lfloor \text{layer\_count} / 2 \rfloor$ |
-| `computed_hash` | `Option<String>` | Computed SHA-1 checksum of the middle/single pixel layer |
+| `computed_hash` | `Option<String>` | Computed SHA-1 checksum of the middle/single pixel layer (layout-specific) |
 | `disposition` | `FileDisposition` | Final classification category |
 | `destination_path` | `Option<PathBuf>` | Target path after sorting / quarantine |
 | `error_reason` | `Option<String>` | Error message if classified as corrupt |
+
+---
+
+### 4. Pixel Hashing Rules by Image Layout
+
+| Layout | Channel Order | Pad Byte Handling | Hashing Target |
+| :--- | :--- | :--- | :--- |
+| **16-bit MONOCHROME2** (Single-layer, 1 sample/pixel) | As-is | None (always even byte count) | Full pixel data value field as stored |
+| **8-bit RGB Interleaved** (Single-layer, `PlanarConfiguration = 0`) | Swap bytes 1 & 3 of every 3-byte pixel (`R, G, B` $\rightarrow$ `B, G, R`) | Trailing pad byte preserved as stored | BGR-swapped `Rows × Columns × 3` bytes followed by pad byte (optional 256-pad sweep `0x00`–`0xFF` fallback) |
+| **Multi-layer (CBCT Volume)** ($N > 1$ frames) | As-is per frame | Even byte count | Target middle frame buffer at offset $\lfloor N / 2 \rfloor \times \text{FrameSize}$ |
 
 ---
 

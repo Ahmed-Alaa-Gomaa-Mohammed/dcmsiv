@@ -83,7 +83,7 @@ src/
 ├── dicom/
 │   ├── mod.rs
 │   ├── header.rs             # Streaming DICOM Part 10 header reader & tag extractor
-│   ├── hasher.rs             # Positional seek & middle/single layer SHA-1 calculator
+│   ├── hasher.rs             # Positional seek, middle-layer & layout-aware (BGR swap) SHA-1 calculator
 │   └── types.rs              # DicomScan, LayerCount, and Tag representations
 ├── db/
 │   ├── mod.rs
