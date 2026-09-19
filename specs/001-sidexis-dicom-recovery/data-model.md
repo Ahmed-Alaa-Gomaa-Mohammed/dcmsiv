@@ -62,11 +62,11 @@ Represents an individual physical file discovered in the input recovery director
 
 ### 4. Pixel Hashing Rules by Image Layout
 
-| Layout | Channel Order | Pad Byte Handling | Hashing Target |
+| Layout | Channel Order | Row Alignment | Hashing Target |
 | :--- | :--- | :--- | :--- |
-| **16-bit MONOCHROME2** (Single-layer, 1 sample/pixel) | As-is | None (always even byte count) | Full pixel data value field as stored |
-| **8-bit RGB Interleaved** (Single-layer, `PlanarConfiguration = 0`) | Swap bytes 1 & 3 of every 3-byte pixel (`R, G, B` $\rightarrow$ `B, G, R`) | Trailing pad byte preserved as stored | BGR-swapped `Rows × Columns × 3` bytes followed by pad byte (optional 256-pad sweep `0x00`–`0xFF` fallback) |
-| **Multi-layer (CBCT Volume)** ($N > 1$ frames) | As-is per frame | Even byte count | Target middle frame buffer at offset $\lfloor N / 2 \rfloor \times \text{FrameSize}$ |
+| **16-bit MONOCHROME2** (Single-layer, 1 sample/pixel) | As-is | None (raw bytes) | Full pixel data value field as stored |
+| **8-bit RGB Interleaved** (Single-layer, `PlanarConfiguration = 0`) | Swap bytes 1 & 3 of every 3-byte pixel (`R, G, B` $\rightarrow$ `B, G, R`) | Each row padded to 4-byte (DWORD) boundary (`pad_per_row = (4 - (Columns × 3) % 4) % 4`) | Windows DIB layout: `Rows × (Columns × 3 + pad_per_row)` bytes, top-to-bottom, DICOM trailing pad byte excluded |
+| **Multi-layer (CBCT Volume)** ($N > 1$ frames) | As-is per frame | None (raw bytes) | Target middle frame buffer at offset $\lfloor N / 2 \rfloor \times \text{FrameSize}$ |
 
 ---
 

@@ -167,9 +167,9 @@
 
 ---
 
-## Phase 10: User Story 1 (Refinement) - 2D RGB Layout-Aware Hashing & Pad Byte Sweep
+## Phase 10: User Story 1 (Refinement) - 2D RGB Layout-Aware Hashing & Pad Byte Sweep (Superseded by Phase 11)
 
-**Goal**: Support SIDEXIS 2D image hashing parity for 8-bit RGB interleaved scans by swapping R and B channels (BGR byte order), preserving trailing pad bytes, and providing 256-pad sweep matching for carved files with altered pad bytes.
+**Goal**: ~~Support SIDEXIS 2D image hashing parity for 8-bit RGB interleaved scans by swapping R and B channels (BGR byte order), preserving trailing pad bytes, and providing 256-pad sweep matching for carved files with altered pad bytes.~~ **Superseded**: Testing against real MediaBase entries revealed that SIDEXIS hashes 8-bit RGB images using a Windows DIB memory layout (BGR + 4-byte row alignment), not raw Pixel Data BGR swap with pad byte retention. See Phase 11.
 
 **Independent Test**: Process synthetic 8-bit RGB DICOM scans with odd pixel dimensions and custom pad bytes; verify that `compute_pixel_layer_hash` accurately derives the BGR-swapped SHA-1 checksum matching `MediaBase.csv` entries.
 
@@ -182,9 +182,29 @@
 
 - [X] T043 [P] [US1] Add `samples_per_pixel`, `photometric_interpretation`, and `planar_configuration` fields to `DicomMetadata` in `src/dicom/types.rs`
 - [X] T044 [US1] Parse `(0028, 0002)`, `(0028, 0004)`, and `(0028, 0006)` tags in streaming DICOM header reader in `src/dicom/header.rs`
-- [X] T045 [US1] Implement 8-bit RGB BGR channel swapping (`R, G, B` -> `B, G, R`) across `Rows * Columns * 3` payload with trailing pad byte retention in `src/dicom/hasher.rs`
-- [X] T046 [US1] Implement `compute_pad_sweep_hashes` helper in `src/dicom/hasher.rs` for evaluating 256 candidate pad byte values
-- [X] T047 [US1] Update candidate matching in `src/engine/processor.rs` to evaluate pad-swept candidate hashes against resolved patient records when direct hash lookup fails on 8-bit RGB scans
+- [X] T045 [US1] Implement 8-bit RGB BGR channel swapping (`R, G, B` -> `B, G, R`) across `Rows * Columns * 3` payload with trailing pad byte retention in `src/dicom/hasher.rs` **(superseded by T048)**
+- [X] T046 [US1] Implement `compute_pad_sweep_hashes` helper in `src/dicom/hasher.rs` for evaluating 256 candidate pad byte values **(superseded — no longer needed)**
+- [X] T047 [US1] Update candidate matching in `src/engine/processor.rs` to evaluate pad-swept candidate hashes against resolved patient records when direct hash lookup fails on 8-bit RGB scans **(superseded — no longer needed)**
+
+---
+
+## Phase 11: User Story 1 (Correction) - Windows DIB Row-Stride Aligned Hashing
+
+**Goal**: Correct the 8-bit RGB hashing to use Windows DIB memory layout (BGR channel order + 4-byte DWORD row alignment) matching SIDEXIS's actual algorithm, remove the superseded pad byte sweep mechanism, and update tests accordingly.
+
+**Discovery**: SIDEXIS internally converts decoded pixel data into a Windows DIB (Device Independent Bitmap) layout before computing SHA-1. This means: (1) BGR channel swap per pixel, (2) each row padded to a 4-byte boundary (`pad_per_row = (4 - (Columns × 3) % 4) % 4`), (3) top-to-bottom row order, (4) no DICOM trailing pad byte. Validated: 21/24 unmatched test files matched after applying this algorithm (remaining 3 are confirmed corrupted duplicate carves).
+
+**Independent Test**: Process 8-bit RGB DICOM scans from `testset/`; verify that `compute_pixel_layer_hash` produces SHA-1 checksums matching the corresponding `MediaBase.csv` entries for all non-corrupt files.
+
+### Tests for Phase 11
+
+- [ ] T048 [P] [US1] Update unit tests in `tests/unit/hasher_tests.rs` to verify Windows DIB row-stride aligned BGR hashing (replacing pad byte retention tests)
+- [ ] T049 [P] [US1] Update synthetic 8-bit RGB DICOM generator in `tests/common/synthetic_dicom.rs` to support DIB row-stride hash validation
+
+### Implementation for Phase 11
+
+- [ ] T050 [US1] Rewrite `compute_pixel_layer_hash` 8-bit RGB branch in `src/dicom/hasher.rs` to reconstruct decoded pixels into Windows DIB layout (BGR + 4-byte row padding) before SHA-1 hashing
+- [ ] T051 [US1] Remove `compute_pad_sweep_hashes` function and pad-sweep fallback matching from `src/engine/processor.rs`
 
 ---
 
@@ -201,8 +221,9 @@ flowchart TD
     US1 --> US5["Phase 6: US5 - Undo Rollback"]
     US1 --> US3["Phase 7: US3 - Progress & Reporting"]
     US1 --> US4["Phase 8: US4 - Dry-Run Mode"]
-    US1 --> P10["Phase 10: 2D RGB Layout-Aware Hashing"]
-    US1 & US6 & US2 & US5 & US3 & US4 & P10 --> P9["Phase 9: Polish & Validation"]
+    US1 --> P10["Phase 10: 2D RGB Hashing (Superseded)"]
+    P10 --> P11["Phase 11: DIB Row-Stride Hashing (Correction)"]
+    US1 & US6 & US2 & US5 & US3 & US4 & P11 --> P9["Phase 9: Polish & Validation"]
 ```
 
 ### User Story Dependencies
@@ -221,6 +242,7 @@ flowchart TD
 - **User Story 1 Tests**: `T010`, `T011`, `T012` can run in parallel before implementation.
 - **User Stories 2, 5, 3, 4**: Can be developed in parallel once US1 and US6 are completed.
 - **Phase 10 (2D RGB Hashing)**: `T041` (unit tests), `T042` (synthetic generator), and `T043` (types) can run in parallel.
+- **Phase 11 (DIB Correction)**: `T048` (unit tests) and `T049` (synthetic generator update) can run in parallel. `T050` (hasher rewrite) and `T051` (pad sweep removal) are sequential.
 
 ---
 
@@ -239,4 +261,5 @@ flowchart TD
 4. Add **US3 (Reporting)** (`T031`–`T035`) for progress bars and recovery metrics.
 5. Add **US4 (Dry-Run)** (`T036`–`T037`) for simulation.
 6. Execute **Phase 9: Polish** (`T038`–`T040`) to verify cross-platform parity and memory bounds.
-7. Execute **Phase 10: 2D RGB Layout Hashing** (`T041`–`T047`) to achieve complete SIDEXIS 2D image hashing parity.
+7. Execute **Phase 10: 2D RGB Layout Hashing** (`T041`–`T047`) — initial BGR swap and pad byte sweep (superseded).
+8. Execute **Phase 11: DIB Row-Stride Correction** (`T048`–`T051`) to achieve correct SIDEXIS 2D image hashing parity using Windows DIB memory layout.

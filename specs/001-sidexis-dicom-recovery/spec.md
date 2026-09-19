@@ -19,7 +19,7 @@
 - Q: Where is transaction and rollback state stored? → A: Transaction logging and rollback manifests are unified exclusively in the SQLite `.dcmsiv_state.db` database (`transactions` table), eliminating standalone JSON undo files.
 - Q: What format is the DICOM pixel data stored in? → A: The pixel data is confirmed to be strictly raw and uncompressed, allowing direct byte-offset positional seeks to the target middle/single layer without decompression overhead.
 - Q: What exit code is returned when processing is interrupted? → A: The tool returns exit code 4 (`INTERRUPTED`) when terminated by a user signal (SIGINT / SIGTERM), achieving complete deterministic parity with the CLI contract.
-- Q: How does SIDEXIS compute the MediaHash for 8-bit RGB 2D single-layer raster images? → A: For 8-bit RGB interleaved images (`PlanarConfiguration = 0`), swap the red and blue channels (BGR byte order) across the first `Rows × Columns × 3` bytes, retain the trailing pad byte from the Pixel Data element as stored, and compute SHA-1. If matching against stored copies where the pad byte was altered, an optional 256-pad sweep (`0x00`..`0xFF`) can be evaluated.
+- Q: How does SIDEXIS compute the MediaHash for 8-bit RGB 2D single-layer raster images? → A: For 8-bit RGB interleaved images (`PlanarConfiguration = 0`), SIDEXIS reconstructs the pixel data into a **Windows DIB (Device Independent Bitmap) memory layout** before hashing: (1) swap the red and blue channels so each pixel is stored in BGR byte order, (2) pad each row to a **4-byte (DWORD) boundary** with `0x00` bytes (pad per row = `(4 - (Columns × 3) % 4) % 4`), (3) rows are stored top-to-bottom (no vertical flip), (4) compute SHA-1 over the resulting DIB pixel buffer. The DICOM trailing pad byte is **not** included in the hash — the hashed buffer is `Rows × (Columns × 3 + row_padding)` bytes. If matching against stored copies, an optional 256-pad sweep is no longer needed since the hash is computed from the decoded pixel array, not the raw Pixel Data element value.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -159,9 +159,9 @@ As a systems operator processing a multi-hundred-gigabyte archive over several h
 - **FR-004**: For each candidate DICOM file, the tool MUST read DICOM metadata, extracting `PatientID` (0010,0020), `RETIRED_OtherPatientIDs` (0010,1000), `AcquisitionDateTime` (0008,002A), and frame count / dimensions.
 - **FR-005**: If `PatientID` is absent or whitespace-only, the tool MUST fall back to `RETIRED_OtherPatientIDs` to resolve the patient's `InternalCardId`.
 - **FR-006**: The tool MUST determine whether each DICOM file is single-layer (raster image, 1 frame) or multi-layer (volumetric scan, >1 frame).
-- **FR-007**: The tool MUST compute the SHA-1 hash of the raw, uncompressed pixel data layer according to image layout:
+- **FR-007**: The tool MUST compute the SHA-1 hash of pixel data according to image layout:
   - For single-layer 16-bit monochrome (`MONOCHROME2`) scans: SHA-1 hash of the raw pixel byte buffer as stored.
-  - For single-layer 8-bit RGB scans with `PlanarConfiguration = 0` (interleaved): SHA-1 hash of the pixel data value after swapping bytes 1 and 3 of every 3-byte pixel (BGR order) across the `Rows × Columns × 3` payload, keeping any trailing pad byte intact. If the incoming pad byte is missing or altered, support sweeping the 256 possible pad byte values (`0x00`–`0xFF`).
+  - For single-layer 8-bit RGB scans with `PlanarConfiguration = 0` (interleaved): reconstruct the decoded pixel array into a **Windows DIB memory layout** — BGR channel order with each row padded to a 4-byte (DWORD) boundary (`pad_per_row = (4 - (Columns × 3) % 4) % 4`), rows top-to-bottom — then compute SHA-1 over the resulting `Rows × (Columns × 3 + pad_per_row)` byte buffer.
   - For multi-layer scans: SHA-1 hash of the middle layer raw pixel byte buffer, where the middle layer index is $\lfloor \text{NumberOfFrames} / 2 \rfloor$.
 - **FR-008**: The tool MUST cross-reference the extracted metadata and computed hash against `MediaBase.csv` and `Patient.csv`:
   - Verify patient identity matches `InternalCardId` $\leftrightarrow$ `PatientId`
@@ -213,7 +213,7 @@ As a systems operator processing a multi-hundred-gigabyte archive over several h
 - **MediaBase Record**:
   - `PatientId`: Foreign key linking to the `Patient Record`.
   - `CreationDate`: Timestamp corresponding to when the image acquisition took place.
-  - `MediaHash`: Pre-calculated SHA-1 hexadecimal checksum representing the middle layer (for volumes) or single layer (for raster scans, using BGR channel swap and pad byte retention for 8-bit RGB).
+  - `MediaHash`: Pre-calculated SHA-1 hexadecimal checksum representing the middle layer (for volumes) or single layer (for raster scans, using Windows DIB memory layout with BGR channel order and 4-byte row alignment for 8-bit RGB).
   - `RootNode`: Unifying identifier grouping multiple database rows that belong to the same physical media file.
 - **DICOM Scan Asset**:
   - `SourcePath`: File path where the unsorted scan was located.
@@ -260,7 +260,7 @@ As a systems operator processing a multi-hundred-gigabyte archive over several h
 - The patient's primary clinic-facing directory name is `InternalCardId` (clinic chart number), as this is unique across all SIDEXIS servers and matches what clinical staff use to identify patients.
 - Single-layer DICOM scans have a frame count of 1 (or lack a `NumberOfFrames` attribute), while multi-layer volumetric scans have a frame count > 1.
 - Middle layer for multi-layer scans is 0-indexed at frame $\lfloor \text{NumberOfFrames} / 2 \rfloor$.
-- SHA-1 hash is computed directly over the raw pixel byte buffer of the target frame (with red/blue channel swap to BGR order for 8-bit RGB single-layer images and pad byte retention), matching the hashing algorithm utilized by SIDEXIS when storing `MediaHash`.
+- SHA-1 hash is computed over the pixel byte buffer of the target frame: for 16-bit monochrome, directly over the raw bytes as stored; for 8-bit RGB single-layer images, over a reconstructed Windows DIB memory layout (BGR channel order, rows padded to 4-byte DWORD boundaries, top-to-bottom); matching the hashing algorithm utilized by SIDEXIS when storing `MediaHash`.
 - All SIDEXIS DICOM pixel data payloads are strictly raw and uncompressed Little Endian rasters or volumes, enabling direct positional seeks to calculate frame offsets and SHA-1 checksums without decompression.
 - Date and time formatting in filenames follows the standard `YYYY-MM-DD_HH-mm-ss` format for human readability and chronological filesystem sorting.
 - Any PHI encountered during local recovery is protected in accordance with the project constitution and never committed or transmitted over external networks.
