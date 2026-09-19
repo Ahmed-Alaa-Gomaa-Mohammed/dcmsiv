@@ -44,6 +44,30 @@ Build `dcmsiv`, a high-performance cross-platform CLI tool in Rust specifically 
 
 **Scale/Scope**: Archives containing up to 100,000+ files and 500+ GB of raw imaging data.
 
+### Layout-Aware DICOM Hashing Architecture (8-bit RGB & Function Updates)
+
+To support SIDEXIS parity for 2D images as documented in `sidexis-import-hash(1).md`, the tool must distinguish pixel layouts and apply layout-specific hashing rules:
+
+#### 1. Header Tags Required for Layer Data Type Identification
+- `(0028, 0002)` `SamplesPerPixel` (US): `1` for monochrome, `3` for RGB.
+- `(0028, 0004)` `PhotometricInterpretation` (CS): `"RGB"`, `"MONOCHROME2"`, etc.
+- `(0028, 0006)` `PlanarConfiguration` (US): `0` (color-by-pixel: `R1 G1 B1 R2 G2 B2`), `1` (color-by-plane).
+- `(0028, 0100)` `BitsAllocated` (US): `8` for 8-bit, `16` for 16-bit.
+- `(0028, 0008)` `NumberOfFrames` (IS): Frame count (`<= 1` for single-layer raster, `> 1` for CBCT volume).
+
+#### 2. Function Updates & Impact Matrix
+
+| Module | Function / Struct | Proposed Update & Technical Action |
+| :--- | :--- | :--- |
+| `src/dicom/types.rs` | `struct DicomMetadata` | Add fields: `samples_per_pixel: u16`, `photometric_interpretation: Option<String>`, `planar_configuration: u16`. |
+| `src/dicom/header.rs` | `read_dicom_header()` | Add match arms in streaming loop for `(0028, 0002)` (read US `u16`), `(0028, 0004)` (read CS `String`), and `(0028, 0006)` (read US `u16`). Populate new fields on `DicomMetadata`. |
+| `src/dicom/hasher.rs` | `compute_pixel_layer_hash()` | Check for 8-bit RGB single layer (`samples_per_pixel == 3 && bits_allocated == 8 && frames <= 1`). When `planar_configuration == 0`, read payload, swap bytes 1 and 3 (`R` and `B`) across `Rows × Columns × 3`, append any trailing pad byte untouched, and hash via SHA-1. |
+| `src/dicom/hasher.rs` | `compute_pad_sweep_hashes()` | Add helper returning candidate SHA-1 hashes across all 256 possible trailing pad byte values (`0x00`..`0xFF`) for carved files with altered pad bytes. |
+| `src/engine/processor.rs` | `process_candidate_file()` | In `MediaBase` matching step: if direct `computed_hash` fails and the file is an 8-bit RGB raster with odd pixel count, check candidate patient records against pad-swept hashes. |
+| `tests/common/synthetic_dicom.rs` | `create_synthetic_rgb_dicom()` | Generate synthetic 8-bit RGB DICOM test files with odd dimensions and trailing pad bytes for deterministic unit/integration testing. |
+| `tests/unit/header_tests.rs` | Unit test suite | Add assertions verifying extraction of `samples_per_pixel`, `photometric_interpretation`, and `planar_configuration`. |
+| `tests/unit/hasher_tests.rs` | Unit test suite | Add unit tests for 8-bit RGB BGR swapping, pad byte preservation, and 16-bit MONOCHROME2 untouched hashing. |
+
 ## Constitution Check
 
 *GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*

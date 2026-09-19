@@ -93,6 +93,9 @@ pub struct DicomMetadata {
     pub rows: u16,
     pub columns: u16,
     pub bits_allocated: u16,
+    pub samples_per_pixel: u16,
+    pub photometric_interpretation: Option<String>,
+    pub planar_configuration: u16,
     pub pixel_data_offset: u64,
     pub pixel_data_length: u64,
 }

@@ -83,3 +83,30 @@ fn test_read_truncated_dicom_fails() {
     let err = read_dicom_header(&file_path).unwrap_err();
     assert!(matches!(err, DicomHeaderError::PrematureEof));
 }
+
+#[test]
+fn test_read_synthetic_rgb_dicom_header() {
+    let dir = tempdir().unwrap();
+    let file_path = dir.path().join("rgb.dcm");
+
+    let opts = crate::common::synthetic_dicom::SyntheticRgbOptions {
+        patient_id: Some("RGB_PAT_01".to_string()),
+        other_patient_ids: None,
+        acquisition_date_time: Some("20260420223801".to_string()),
+        rows: 65,
+        columns: 65,
+        custom_pad_byte: Some(0xAB),
+    };
+
+    let info = crate::common::synthetic_dicom::generate_synthetic_rgb_dicom(&file_path, &opts).unwrap();
+    let meta = read_dicom_header(&file_path).unwrap();
+
+    assert_eq!(meta.patient_id.as_deref(), Some("RGB_PAT_01"));
+    assert_eq!(meta.samples_per_pixel, 3);
+    assert_eq!(meta.photometric_interpretation.as_deref(), Some("RGB"));
+    assert_eq!(meta.planar_configuration, 0);
+    assert_eq!(meta.bits_allocated, 8);
+    assert_eq!(meta.rows, 65);
+    assert_eq!(meta.columns, 65);
+    assert_eq!(meta.pixel_data_length as usize, info.total_pixel_bytes_with_pad);
+}

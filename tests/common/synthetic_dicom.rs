@@ -256,3 +256,127 @@ pub fn generate_corrupt_dicom(path: &Path, corrupt_magic: bool) -> io::Result<()
     }
     Ok(())
 }
+
+#[derive(Debug, Clone)]
+pub struct SyntheticRgbOptions {
+    pub patient_id: Option<String>,
+    pub other_patient_ids: Option<String>,
+    pub acquisition_date_time: Option<String>,
+    pub rows: u16,
+    pub columns: u16,
+    pub custom_pad_byte: Option<u8>,
+}
+
+impl Default for SyntheticRgbOptions {
+    fn default() -> Self {
+        Self {
+            patient_id: Some("SYNTH_RGB_01".to_string()),
+            other_patient_ids: None,
+            acquisition_date_time: Some("20230515123045".to_string()),
+            rows: 65, // 65 * 65 * 3 = 12675 (odd, triggers pad byte)
+            columns: 65,
+            custom_pad_byte: None,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct SyntheticRgbInfo {
+    pub bgr_swapped_hash: String,
+    pub total_pixel_bytes_with_pad: usize,
+    pub patient_id: Option<String>,
+    pub pad_byte: Option<u8>,
+}
+
+/// Generates a valid single-layer 8-bit RGB DICOM Part 10 file with zero PHI.
+pub fn generate_synthetic_rgb_dicom(
+    path: &Path,
+    options: &SyntheticRgbOptions,
+) -> io::Result<SyntheticRgbInfo> {
+    let mut file = File::create(path)?;
+
+    // 1. 128 bytes preamble + DICM magic
+    file.write_all(&[0u8; 128])?;
+    file.write_all(b"DICM")?;
+
+    // 2. File Meta Information
+    write_explicit_element(&mut file, 0x0002, 0x0010, b"UI", b"1.2.840.10008.1.2.1")?; // Explicit VR Little Endian
+    write_explicit_element(&mut file, 0x0002, 0x0002, b"UI", b"1.2.840.10008.5.1.4.1.1.77.1.4")?; // VL Photographic
+    write_explicit_element(&mut file, 0x0002, 0x0003, b"UI", b"1.2.826.0.1.3680043.8.498.99999")?;
+
+    // 3. Dataset elements
+    if let Some(ref dt) = options.acquisition_date_time {
+        write_explicit_element(&mut file, 0x0008, 0x002A, b"DT", dt.as_bytes())?;
+    }
+    if let Some(ref pid) = options.patient_id {
+        write_explicit_element(&mut file, 0x0010, 0x0020, b"LO", pid.as_bytes())?;
+    }
+    if let Some(ref opid) = options.other_patient_ids {
+        write_explicit_element(&mut file, 0x0010, 0x1000, b"LO", opid.as_bytes())?;
+    }
+
+    // (0028, 0002) SamplesPerPixel = 3
+    write_explicit_element(&mut file, 0x0028, 0x0002, b"US", &3u16.to_le_bytes())?;
+    // (0028, 0004) PhotometricInterpretation = RGB
+    write_explicit_element(&mut file, 0x0028, 0x0004, b"CS", b"RGB")?;
+    // (0028, 0006) PlanarConfiguration = 0
+    write_explicit_element(&mut file, 0x0028, 0x0006, b"US", &0u16.to_le_bytes())?;
+    // (0028, 0008) NumberOfFrames = 1
+    write_explicit_element(&mut file, 0x0028, 0x0008, b"IS", b"1")?;
+    // (0028, 0010) Rows
+    write_explicit_element(&mut file, 0x0028, 0x0010, b"US", &options.rows.to_le_bytes())?;
+    // (0028, 0011) Columns
+    write_explicit_element(&mut file, 0x0028, 0x0011, b"US", &options.columns.to_le_bytes())?;
+    // (0028, 0100) BitsAllocated = 8
+    write_explicit_element(&mut file, 0x0028, 0x0100, b"US", &8u16.to_le_bytes())?;
+    // (0028, 0101) BitsStored = 8
+    write_explicit_element(&mut file, 0x0028, 0x0101, b"US", &8u16.to_le_bytes())?;
+    // (0028, 0102) HighBit = 7
+    write_explicit_element(&mut file, 0x0028, 0x0102, b"US", &7u16.to_le_bytes())?;
+    // (0028, 0103) PixelRepresentation = 0
+    write_explicit_element(&mut file, 0x0028, 0x0103, b"US", &0u16.to_le_bytes())?;
+
+    // Generate raw pixel payload
+    let raw_pixel_len = (options.rows as usize) * (options.columns as usize) * 3;
+    let mut raw_pixels = Vec::with_capacity(raw_pixel_len + 1);
+    for i in 0..raw_pixel_len {
+        // Generate non-gray pixels so R != B (test channel swapping)
+        let channel = i % 3;
+        let pixel_idx = i / 3;
+        let val = match channel {
+            0 => ((pixel_idx * 7 + 10) % 256) as u8,  // R
+            1 => ((pixel_idx * 13 + 50) % 256) as u8, // G
+            2 => ((pixel_idx * 19 + 90) % 256) as u8, // B
+            _ => unreachable!(),
+        };
+        raw_pixels.push(val);
+    }
+
+    let is_odd = raw_pixel_len % 2 != 0;
+    let pad_byte = if is_odd {
+        let b = options.custom_pad_byte.unwrap_or(0x00);
+        raw_pixels.push(b);
+        Some(b)
+    } else {
+        None
+    };
+
+    // Calculate BGR-swapped reference hash
+    let mut swapped_pixels = raw_pixels.clone();
+    for i in (0..raw_pixel_len).step_by(3) {
+        swapped_pixels.swap(i, i + 2); // Swap R and B
+    }
+    let mut hasher = Sha1::new();
+    hasher.update(&swapped_pixels);
+    let bgr_swapped_hash = format!("{:040x}", hasher.finalize());
+
+    // Write (7FE0, 0010) OB element
+    write_explicit_long_element(&mut file, 0x7FE0, 0x0010, b"OB", &raw_pixels)?;
+
+    Ok(SyntheticRgbInfo {
+        bgr_swapped_hash,
+        total_pixel_bytes_with_pad: raw_pixels.len(),
+        patient_id: options.patient_id.clone(),
+        pad_byte,
+    })
+}

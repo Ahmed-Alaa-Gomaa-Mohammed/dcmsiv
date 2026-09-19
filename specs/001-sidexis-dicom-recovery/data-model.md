@@ -50,6 +50,9 @@ Represents an individual physical file discovered in the input recovery director
 | `acquisition_datetime`| `Option<NaiveDateTime>`| Extracted from Tag `(0008, 002A)` or fallback date/time tags |
 | `layer_count` | `usize` | Total number of frames (`(0028, 0008)`), defaults to 1 if absent |
 | `middle_layer_index` | `usize` | $\lfloor \text{layer\_count} / 2 \rfloor$ |
+| `samples_per_pixel` | `u16` | Samples per pixel (`(0028, 0002)`), 1 for mono, 3 for RGB |
+| `photometric_interpretation`| `Option<String>`| Photometric interpretation (`(0028, 0004)`), e.g. "RGB", "MONOCHROME2" |
+| `planar_configuration` | `u16` | Planar configuration (`(0028, 0006)`), 0 for interleaved RGB |
 | `computed_hash` | `Option<String>` | Computed SHA-1 checksum of the middle/single pixel layer (layout-specific) |
 | `disposition` | `FileDisposition` | Final classification category |
 | `destination_path` | `Option<PathBuf>` | Target path after sorting / quarantine |

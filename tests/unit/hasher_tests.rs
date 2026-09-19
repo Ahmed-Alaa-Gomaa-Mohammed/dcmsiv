@@ -80,3 +80,49 @@ fn test_hasher_real_testset_file_31() {
     assert!(layer_count.is_multi());
     assert_eq!(hash, "b3cf7bdfe02dcfc751fe4d884d62d6ab43c78e6c");
 }
+
+#[test]
+fn test_hasher_8bit_rgb_bgr_swap_and_pad_byte() {
+    let dir = tempdir().unwrap();
+    let file_path = dir.path().join("rgb_test.dcm");
+
+    let opts = crate::common::synthetic_dicom::SyntheticRgbOptions {
+        patient_id: Some("RGB_P01".to_string()),
+        other_patient_ids: None,
+        acquisition_date_time: Some("20260420223801".to_string()),
+        rows: 65,
+        columns: 65,
+        custom_pad_byte: Some(0x7F),
+    };
+
+    let info = crate::common::synthetic_dicom::generate_synthetic_rgb_dicom(&file_path, &opts).unwrap();
+    let meta = read_dicom_header(&file_path).unwrap();
+    let (computed_hash, layer_count) = compute_pixel_layer_hash(&file_path, &meta).unwrap();
+
+    assert_eq!(layer_count, LayerCount::Single);
+    assert_eq!(computed_hash, info.bgr_swapped_hash);
+}
+
+#[test]
+fn test_hasher_8bit_rgb_pad_sweep() {
+    let dir = tempdir().unwrap();
+    let file_path = dir.path().join("rgb_sweep_test.dcm");
+
+    let expected_pad = 0xA5u8;
+    let opts = crate::common::synthetic_dicom::SyntheticRgbOptions {
+        rows: 65,
+        columns: 65,
+        custom_pad_byte: Some(expected_pad),
+        ..Default::default()
+    };
+
+    let info = crate::common::synthetic_dicom::generate_synthetic_rgb_dicom(&file_path, &opts).unwrap();
+    let meta = read_dicom_header(&file_path).unwrap();
+
+    let sweep = dcmsiv::dicom::hasher::compute_pad_sweep_hashes(&file_path, &meta).unwrap();
+    assert_eq!(sweep.len(), 256);
+
+    // Find the candidate matching expected_pad
+    let matched = sweep.iter().find(|(_, pad)| *pad == expected_pad).unwrap();
+    assert_eq!(matched.0, info.bgr_swapped_hash);
+}

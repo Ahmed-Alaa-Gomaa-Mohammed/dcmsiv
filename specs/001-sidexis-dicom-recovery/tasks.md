@@ -47,7 +47,7 @@
 
 ### Implementation for User Story 1
 
-- [X] T013 [US1] Implement streaming DICOM Part 10 header reader extracting `PatientID` (0010,0020), `RETIRED_OtherPatientIDs` (0010,1000), `AcquisitionDateTime` (0008,002A), and frame dimensions in `src/dicom/header.rs`
+- [X] T013 [US1] Implement streaming DICOM Part 10 header reader extracting `PatientID` (0010,0020), `RETIRED_OtherPatientIDs` (0010,1000), `AcquisitionDateTime` (0008,002A), frame dimensions, and layer layout tags (`SamplesPerPixel`, `PhotometricInterpretation`, `PlanarConfiguration`) in `src/dicom/header.rs`
 - [X] T014 [US1] Implement positional seek, middle-layer SHA-1 stream calculator, and 8-bit RGB BGR channel swapper with pad byte retention/sweep in `src/dicom/hasher.rs`
 - [X] T015 [US1] Implement database matching logic cross-referencing candidate scans against in-memory indexed `Patient` and `MediaBase` records in `src/engine/processor.rs`
 - [X] T016 [US1] Implement collision-safe file mover (`std::fs::rename` with stream copy fallback) with naming `Volume_<FormattedDateTime>.dcm` or `RasterImage_<FormattedDateTime>.dcm` in `src/engine/sorter.rs`
@@ -167,6 +167,27 @@
 
 ---
 
+## Phase 10: User Story 1 (Refinement) - 2D RGB Layout-Aware Hashing & Pad Byte Sweep
+
+**Goal**: Support SIDEXIS 2D image hashing parity for 8-bit RGB interleaved scans by swapping R and B channels (BGR byte order), preserving trailing pad bytes, and providing 256-pad sweep matching for carved files with altered pad bytes.
+
+**Independent Test**: Process synthetic 8-bit RGB DICOM scans with odd pixel dimensions and custom pad bytes; verify that `compute_pixel_layer_hash` accurately derives the BGR-swapped SHA-1 checksum matching `MediaBase.csv` entries.
+
+### Tests for Phase 10
+
+- [X] T041 [P] [US1] Create unit tests for 8-bit RGB BGR swapping, odd dimension pad byte retention, and 256-pad sweep in `tests/unit/hasher_tests.rs`
+- [X] T042 [P] [US1] Add synthetic 8-bit RGB DICOM generator with configurable dimensions and pad byte in `tests/common/synthetic_dicom.rs`
+
+### Implementation for Phase 10
+
+- [X] T043 [P] [US1] Add `samples_per_pixel`, `photometric_interpretation`, and `planar_configuration` fields to `DicomMetadata` in `src/dicom/types.rs`
+- [X] T044 [US1] Parse `(0028, 0002)`, `(0028, 0004)`, and `(0028, 0006)` tags in streaming DICOM header reader in `src/dicom/header.rs`
+- [X] T045 [US1] Implement 8-bit RGB BGR channel swapping (`R, G, B` -> `B, G, R`) across `Rows * Columns * 3` payload with trailing pad byte retention in `src/dicom/hasher.rs`
+- [X] T046 [US1] Implement `compute_pad_sweep_hashes` helper in `src/dicom/hasher.rs` for evaluating 256 candidate pad byte values
+- [X] T047 [US1] Update candidate matching in `src/engine/processor.rs` to evaluate pad-swept candidate hashes against resolved patient records when direct hash lookup fails on 8-bit RGB scans
+
+---
+
 ## Dependencies & Execution Order
 
 ### Phase Dependencies
@@ -180,7 +201,8 @@ flowchart TD
     US1 --> US5["Phase 6: US5 - Undo Rollback"]
     US1 --> US3["Phase 7: US3 - Progress & Reporting"]
     US1 --> US4["Phase 8: US4 - Dry-Run Mode"]
-    US1 & US6 & US2 & US5 & US3 & US4 --> P9["Phase 9: Polish & Validation"]
+    US1 --> P10["Phase 10: 2D RGB Layout-Aware Hashing"]
+    US1 & US6 & US2 & US5 & US3 & US4 & P10 --> P9["Phase 9: Polish & Validation"]
 ```
 
 ### User Story Dependencies
@@ -198,6 +220,7 @@ flowchart TD
 - **Phase 2 Foundational**: `T005` (domain types), `T006` (CSV reader), and `T007` (SQLite schema) can run in parallel.
 - **User Story 1 Tests**: `T010`, `T011`, `T012` can run in parallel before implementation.
 - **User Stories 2, 5, 3, 4**: Can be developed in parallel once US1 and US6 are completed.
+- **Phase 10 (2D RGB Hashing)**: `T041` (unit tests), `T042` (synthetic generator), and `T043` (types) can run in parallel.
 
 ---
 
@@ -216,3 +239,4 @@ flowchart TD
 4. Add **US3 (Reporting)** (`T031`–`T035`) for progress bars and recovery metrics.
 5. Add **US4 (Dry-Run)** (`T036`–`T037`) for simulation.
 6. Execute **Phase 9: Polish** (`T038`–`T040`) to verify cross-platform parity and memory bounds.
+7. Execute **Phase 10: 2D RGB Layout Hashing** (`T041`–`T047`) to achieve complete SIDEXIS 2D image hashing parity.

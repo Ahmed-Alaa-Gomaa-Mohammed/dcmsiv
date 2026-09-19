@@ -141,6 +141,9 @@ pub fn read_dicom_header(path: &Path) -> Result<DicomMetadata, DicomHeaderError>
     let mut rows: u16 = 0;
     let mut columns: u16 = 0;
     let mut bits_allocated: u16 = 16;
+    let mut samples_per_pixel: u16 = 1;
+    let mut photometric_interpretation: Option<String> = None;
+    let mut planar_configuration: u16 = 0;
     let mut pixel_data_offset: Option<u64> = None;
     let mut pixel_data_length: Option<u64> = None;
 
@@ -269,6 +272,31 @@ pub fn read_dicom_header(path: &Path) -> Result<DicomMetadata, DicomHeaderError>
                         .to_string(),
                 );
             }
+            (0x0028, 0x0002) => {
+                let mut buf = vec![0u8; length as usize];
+                file.read_exact(&mut buf)?;
+                if buf.len() >= 2 {
+                    samples_per_pixel = u16::from_le_bytes([buf[0], buf[1]]);
+                }
+            }
+            (0x0028, 0x0004) => {
+                let mut buf = vec![0u8; length as usize];
+                file.read_exact(&mut buf)?;
+                let s = String::from_utf8_lossy(&buf)
+                    .trim_matches('\0')
+                    .trim()
+                    .to_string();
+                if !s.is_empty() {
+                    photometric_interpretation = Some(s);
+                }
+            }
+            (0x0028, 0x0006) => {
+                let mut buf = vec![0u8; length as usize];
+                file.read_exact(&mut buf)?;
+                if buf.len() >= 2 {
+                    planar_configuration = u16::from_le_bytes([buf[0], buf[1]]);
+                }
+            }
             (0x0028, 0x0008) => {
                 let mut buf = vec![0u8; length as usize];
                 file.read_exact(&mut buf)?;
@@ -333,6 +361,9 @@ pub fn read_dicom_header(path: &Path) -> Result<DicomMetadata, DicomHeaderError>
         rows,
         columns,
         bits_allocated,
+        samples_per_pixel,
+        photometric_interpretation,
+        planar_configuration,
         pixel_data_offset,
         pixel_data_length,
     })
